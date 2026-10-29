@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         番茄小说全能增强（双书名直观展示 + 详情页新标签打开零重载 + 榜单全数据透视 + 移动端自愈）
 // @namespace    fanqie.allinone.enhancer
-// @version      36.3.1
-// @description  官方全网搜索（修复按钮与回车事件监听，纯官方直连，支持书名、作者与书号直达）；详情页作者名一键进入作者主页（纠偏媒体ID与创作者ID双向绑定）；作者主页(/author-page/*)下架绝版神作穿透显形与真实书号一键复制；独家集成【⚡系统流】专属热度榜单；当前分类【🌐全榜大聚合】热门+阅读+高分+催更4大主榜全量去重汇聚与8大运营指标即时重排序；彻底杜绝重复书籍；双书名无冗余文案直接并列展示【当前主书名 + 曾用名】；详情页满宽通栏卡片优化；新标签页极速打开零重载；移动端自愈防拦截！
+// @version      36.4.0
+// @description  官方全网搜索（修复按钮与回车事件监听，纯官方直连，支持书名、作者与书号直达）；详情页单例防重运营看板；智能识别并复活CP合作作者影子账号(用户xxxx还原真实笔名与全集作品)；作者主页(/author-page/*)下架绝版神作穿透显形与真实书号一键复制；双书名无冗余文案直接并列展示【当前主书名 + 曾用名】；新标签页极速打开零重载；移动端自愈防拦截！
 // @author       you
 // @match        https://fanqienovel.com/*
 // @match        https://*.fanqienovel.com/*
@@ -1540,7 +1540,8 @@ var __fqsign=(()=>{var z=Object.defineProperty;var dt=Object.getOwnPropertyDescr
       </div>
     `;
 
-    // 优化挂载点：脱离狭窄的封面右侧容器，整块看板满宽通栏插入到整书头部下方
+    // 优化挂载点：强力单例防重，先移除页面可能残留的旧看板，整块看板满宽通栏插入到整书头部下方
+    document.querySelectorAll('#fq-deep-dashboard').forEach(el => el.remove());
     const pageHeader = document.querySelector('.page-header') || document.querySelector('.page-header-info') || (titleEl ? titleEl.closest('.page-header') || titleEl.parentElement : null);
     if (pageHeader && pageHeader.parentElement) {
       pageHeader.parentElement.insertBefore(board, pageHeader.nextSibling);
@@ -1606,6 +1607,38 @@ var __fqsign=(()=>{var z=Object.defineProperty;var dt=Object.getOwnPropertyDescr
     } catch(e) {}
 
     if (authorData) {
+      // 智能识别并复活 CP 合作作者影子账号（如“用户69037758” ➔ 自动还原为真实笔名“唐三葬”）
+      let cpRealAuthorName = null;
+      if (authorData.user_name && !authorData.user_name.startsWith('用户')) {
+        cpRealAuthorName = authorData.user_name;
+      }
+
+      if (cpRealAuthorName) {
+        document.querySelectorAll('.author-name, .muye-author-page .title, h1, .name').forEach(el => {
+          if (el.textContent && el.textContent.includes('用户')) {
+            el.innerHTML = `${cpRealAuthorName} <span style="font-size: 12px; background: #fff0eb; color: #ff5722; padding: 2px 6px; border-radius: 4px; font-weight: normal; margin-left: 6px;">CP认证作家</span>`;
+          }
+        });
+        document.title = `${cpRealAuthorName}_全部作品_番茄小说官网`;
+      }
+
+      // 如果页面作品总数为 0 (如 CP 合作作者空壳页)，自动通过官方全网网关拉取该作者真实名下的全量小说！
+      if (existingBookIds.size === 0 && cpRealAuthorName) {
+        try {
+          const searchUrl = `https://api.fanqiesdk.com/api/novel/channel/homepage/search/search/v1/?q=${encodeURIComponent(cpRealAuthorName)}&offset=0&aid=13&app_name=news_article&version_code=708&device_platform=android`;
+          const sText = await gmGet(searchUrl);
+          if (sText) {
+            const sj = JSON.parse(sText);
+            const list = sj.data?.ret_data || [];
+            list.forEach(item => {
+              if (item.author === cpRealAuthorName && item.book_id) {
+                hiddenCandidateIds.add(String(item.book_id));
+              }
+            });
+          }
+        } catch(e) {}
+      }
+
       // 扫描勋章与运营官头衔
       const titles = authorData.user_title_infos || [];
       titles.forEach(t => {
@@ -1624,6 +1657,14 @@ var __fqsign=(()=>{var z=Object.defineProperty;var dt=Object.getOwnPropertyDescr
     // 过滤掉当前网页页面上已经正常展示的在架书
     const trueHiddenIds = Array.from(hiddenCandidateIds).filter(id => !existingBookIds.has(id));
     if (trueHiddenIds.length === 0) return;
+
+    // 清理官方页面原本冷冰冰的“暂无签约作品”空白占位提示
+    document.querySelectorAll('div, p, span').forEach(el => {
+      if (el.textContent && el.textContent.trim() === '暂无签约作品') {
+        const parent = el.closest('div') || el;
+        parent.style.display = 'none';
+      }
+    });
 
     // 标记已处理
     const marker = document.createElement('div');
