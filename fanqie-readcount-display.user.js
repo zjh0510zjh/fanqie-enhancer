@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         番茄小说全能增强（双书名直观展示 + 详情页新标签打开零重载 + 榜单全数据透视 + 移动端自愈）
 // @namespace    fanqie.allinone.enhancer
-// @version      36.2.1
-// @description  官方全网搜索（修复按钮与回车事件监听，纯官方直连，支持书名、作者与书号直达）；作者主页(/author-page/*)下架绝版神作穿透显形与真实书号一键复制；独家集成【⚡系统流】专属热度榜单；当前分类【🌐全榜大聚合】热门+阅读+高分+催更4大主榜全量去重汇聚与8大运营指标即时重排序；彻底杜绝重复书籍；双书名无冗余文案直接并列展示【当前主书名 + 曾用名】；详情页满宽通栏卡片优化；新标签页极速打开零重载；移动端自愈防拦截！
+// @version      36.3.0
+// @description  官方全网搜索（修复按钮与回车事件监听，纯官方直连，支持书名、作者与书号直达）；详情页作者名一键进入作者主页；作者主页(/author-page/*)下架绝版神作穿透显形与真实书号一键复制；独家集成【⚡系统流】专属热度榜单；当前分类【🌐全榜大聚合】热门+阅读+高分+催更4大主榜全量去重汇聚与8大运营指标即时重排序；彻底杜绝重复书籍；双书名无冗余文案直接并列展示【当前主书名 + 曾用名】；详情页满宽通栏卡片优化；新标签页极速打开零重载；移动端自愈防拦截！
 // @author       you
 // @match        https://fanqienovel.com/*
 // @match        https://*.fanqienovel.com/*
@@ -1440,6 +1440,39 @@ var __fqsign=(()=>{var z=Object.defineProperty;var dt=Object.getOwnPropertyDescr
       }
     }
 
+    // 核心改进：详情页作者名字可点击直达作者主页（移动端+PC端）
+    let authorId = null;
+    if (appData && appData.author_id) {
+      authorId = String(appData.author_id).replace(/^2_/, '');
+    }
+    if (!authorId && typeof window !== 'undefined' && window.__INITIAL_STATE__?.page?.authorId) {
+      authorId = String(window.__INITIAL_STATE__.page.authorId).replace(/^2_/, '');
+    }
+    if (!authorId) {
+      const ldScript = document.querySelector('script[type="application/ld+json"]');
+      if (ldScript) {
+        const mId = ldScript.textContent.match(/author-page\/([0-9]+)/);
+        if (mId) authorId = mId[1];
+      }
+    }
+
+    const authorEl = document.querySelector('.info-author') || document.querySelector('.author') || Array.from(document.querySelectorAll('div, p, span')).find(el => el.textContent && el.textContent.includes(' / 著'));
+    if (authorEl && authorId && !document.getElementById('fq-author-home-link')) {
+      const authorName = (appData.author || authorEl.textContent.replace(/\s*\/\s*著.*/, '')).trim();
+      authorEl.innerHTML = `
+        <a id="fq-author-home-link" href="/author-page/${authorId}" style="
+          color: #ff5722; font-weight: bold; text-decoration: none; border-bottom: 1.5px solid #ff5722; padding-bottom: 1px;
+        ">${authorName}</a> 
+        <span style="color: #999;">/ 著</span>
+        <a href="/author-page/${authorId}" style="
+          display: inline-flex; align-items: center; margin-left: 8px; font-size: 11px;
+          background: #fff0eb; color: #ff5722; border: 1px solid #ffd8cc; padding: 2px 7px;
+          border-radius: 10px; text-decoration: none; font-weight: 500;
+        ">进作者主页 ➔</a>
+      `;
+    }
+
+    // 强力去重：彻底杜绝移动端看板重复渲染
     if (document.getElementById('fq-deep-dashboard')) return;
 
     const ugcInfo = await fetchRealUgcInfo(bookId);
