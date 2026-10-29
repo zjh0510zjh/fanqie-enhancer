@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         番茄小说全能增强（双书名直观展示 + 详情页新标签打开零重载 + 榜单全数据透视 + 移动端自愈）
 // @namespace    fanqie.allinone.enhancer
-// @version      36.3.0
-// @description  官方全网搜索（修复按钮与回车事件监听，纯官方直连，支持书名、作者与书号直达）；详情页作者名一键进入作者主页；作者主页(/author-page/*)下架绝版神作穿透显形与真实书号一键复制；独家集成【⚡系统流】专属热度榜单；当前分类【🌐全榜大聚合】热门+阅读+高分+催更4大主榜全量去重汇聚与8大运营指标即时重排序；彻底杜绝重复书籍；双书名无冗余文案直接并列展示【当前主书名 + 曾用名】；详情页满宽通栏卡片优化；新标签页极速打开零重载；移动端自愈防拦截！
+// @version      36.3.1
+// @description  官方全网搜索（修复按钮与回车事件监听，纯官方直连，支持书名、作者与书号直达）；详情页作者名一键进入作者主页（纠偏媒体ID与创作者ID双向绑定）；作者主页(/author-page/*)下架绝版神作穿透显形与真实书号一键复制；独家集成【⚡系统流】专属热度榜单；当前分类【🌐全榜大聚合】热门+阅读+高分+催更4大主榜全量去重汇聚与8大运营指标即时重排序；彻底杜绝重复书籍；双书名无冗余文案直接并列展示【当前主书名 + 曾用名】；详情页满宽通栏卡片优化；新标签页极速打开零重载；移动端自愈防拦截！
 // @author       you
 // @match        https://fanqienovel.com/*
 // @match        https://*.fanqienovel.com/*
@@ -1440,20 +1440,18 @@ var __fqsign=(()=>{var z=Object.defineProperty;var dt=Object.getOwnPropertyDescr
       }
     }
 
-    // 核心改进：详情页作者名字可点击直达作者主页（移动端+PC端）
+    // 核心改进：详情页作者名字可点击直达作者主页（优先提取对外展示主页 ID，避免跳入底层的默认“用户xxx”空号）
     let authorId = null;
-    if (appData && appData.author_id) {
-      authorId = String(appData.author_id).replace(/^2_/, '');
+    const ldScript = document.querySelector('script[type="application/ld+json"]');
+    if (ldScript) {
+      const mId = ldScript.textContent.match(/author-page\/([0-9]+)/);
+      if (mId) authorId = mId[1];
     }
     if (!authorId && typeof window !== 'undefined' && window.__INITIAL_STATE__?.page?.authorId) {
       authorId = String(window.__INITIAL_STATE__.page.authorId).replace(/^2_/, '');
     }
-    if (!authorId) {
-      const ldScript = document.querySelector('script[type="application/ld+json"]');
-      if (ldScript) {
-        const mId = ldScript.textContent.match(/author-page\/([0-9]+)/);
-        if (mId) authorId = mId[1];
-      }
+    if (!authorId && appData && appData.author_id) {
+      authorId = String(appData.author_id).replace(/^2_/, '');
     }
 
     const authorEl = document.querySelector('.info-author') || document.querySelector('.author') || Array.from(document.querySelectorAll('div, p, span')).find(el => el.textContent && el.textContent.includes(' / 著'));
@@ -1581,7 +1579,8 @@ var __fqsign=(()=>{var z=Object.defineProperty;var dt=Object.getOwnPropertyDescr
       // 西瓜一斤两块: 《大反派？分明是我方好师兄！》
       '3504898858821816': ['7282023089225862201'],
       '7282023090018587960': ['7282023089225862201'],
-      // 玲珑大人: 《永恒仙族》
+      // 玲珑大人: 《永恒仙族》 (兼容对外展示ID与底层创作者ID)
+      '4455654473335271': ['7149395987063114785'],
       '7149395987713234180': ['7149395987063114785'],
       // 爱吃酸菜鱼: 《坏了！萌新群里混进个通天代！》
       '6914855593018660110': ['7472710514896800793'],
